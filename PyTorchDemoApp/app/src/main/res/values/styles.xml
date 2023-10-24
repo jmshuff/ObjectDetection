@@ -91,8 +91,7 @@
         <item name="android:fontFamily">sans-serif-light</item>
     </style>
 
-    <style name="TextAppearanceNLPEditText" parent="TextAppearance.AppCompat.Medium">
-    </style>
+    <style name="TextAppearanceNLPEditText" parent="TextAppearance.AppCompat.Medium"/>
 
     <style name="TextAppearanceTextClassificationResultTop1" parent="TextAppearance.AppCompat.Large">
         <item name="android:textColor">@color/nlpPrimaryColor</item>
