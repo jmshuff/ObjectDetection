@@ -3,6 +3,12 @@ package org.pytorch.demo;
 public class Constants {
   public static final String TAG = "PyTorchDemo";
 
+  public static String[] MOBILENET_CLASSES = new String[]{
+          "Mature Cataract",
+          "Immature Cataract",
+          "Clear lens"
+  };
+
   public static String[] IMAGENET_CLASSES = new String[]{
       "tench, Tinca tinca",
       "goldfish, Carassius auratus",

@@ -86,7 +86,7 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
     protected AnalysisResult analyzeImage(ImageProxy image, int rotationDegrees) {
         try {
             if (mModule == null) {
-                mModule = LiteModuleLoader.load(MainActivity.assetFilePath(getApplicationContext(), "best_lisa.torchscript.ptl"));
+                mModule = LiteModuleLoader.load(MainActivity.assetFilePath(getApplicationContext(), "best_4.torchscript.ptl"));
             }
         } catch (IOException e) {
             Log.e("Object Detection", "Error reading assets", e);
@@ -94,21 +94,27 @@ public class ObjectDetectionActivity extends AbstractCameraXActivity<ObjectDetec
         }
         Bitmap bitmap = imgToBitmap(image.getImage());
         Matrix matrix = new Matrix();
-        matrix.postRotate(90.0f);
+        //matrix.postRotate(90.0f);
         bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+        System.out.println("Input image size: " + bitmap.getHeight() +", " + bitmap.getHeight());
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
 
         final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, TensorImageUtils.TORCHVISION_NORM_MEAN_RGB, TensorImageUtils.TORCHVISION_NORM_STD_RGB);
         IValue[] outputTuple = mModule.forward(IValue.from(inputTensor)).toTuple();
         final Tensor outputTensor = outputTuple[0].toTensor();
         final float[] outputs = outputTensor.getDataAsFloatArray();
+        final Tensor protoTensor = outputTuple[1].toTensor();
+        final float[] proto = protoTensor.getDataAsFloatArray();
+
 
         float imgScaleX = (float)bitmap.getWidth() / PrePostProcessor.mInputWidth;
         float imgScaleY = (float)bitmap.getHeight() / PrePostProcessor.mInputHeight;
         float ivScaleX = (float)mResultView.getWidth() / bitmap.getWidth();
         float ivScaleY = (float)mResultView.getHeight() / bitmap.getHeight();
 
-        final ArrayList<Result> results = PrePostProcessor.outputsToNMSPredictions(outputs, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0);
+        final ArrayList<Result> results = PrePostProcessor.outputsToNMSPredictions(outputs, imgScaleX, imgScaleY, ivScaleX, ivScaleY, 0, 0, proto);
+        System.out.print("outputSize " + String.valueOf(results.size()));
+
         return new AnalysisResult(results);
     }
 }

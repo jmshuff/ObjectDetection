@@ -13,9 +13,11 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 
 public class ResultView extends View {
@@ -61,6 +63,22 @@ public class ResultView extends View {
             mPaintText.setStyle(Paint.Style.FILL);
             mPaintText.setTextSize(32);
             canvas.drawText(String.format("%s %.2f", PrePostProcessor.mClasses[result.classIndex], result.score), result.rect.left + TEXT_X, result.rect.top + TEXT_Y, mPaintText);
+            //canvas.drawText(String.format("%s %.2f", PrePostProcessor.mClasses[0], result.score), result.rect.left + TEXT_X, result.rect.top + TEXT_Y, mPaintText);
+
+            Paint paint = new Paint();
+            paint.setColor(Color.RED); // Color RED in ARGB format
+            System.out.println(Arrays.toString(result.getMask()));
+            // Iterate through the maskArray and draw onto the Bitmap based on the values in the array
+            for (int y = 0; y < 80; y++) {
+                for (int x = 0; x < 80; x++) {
+                    // Assuming maskArray contains the mask values for each pixel
+                    float maskValue = result.getMask()[y * 80 + x];
+                    if (maskValue > 0.5) { // Apply a threshold for drawing the mask
+                        canvas.drawPoint(x, y, paint);
+                    }
+                }
+            }
+
         }
     }
 

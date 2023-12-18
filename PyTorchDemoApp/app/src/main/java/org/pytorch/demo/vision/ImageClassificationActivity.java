@@ -189,7 +189,7 @@ public class ImageClassificationActivity extends AbstractCameraXActivity<ImageCl
       final float[] topKScores = new float[TOP_K];
       for (int i = 0; i < TOP_K; i++) {
         final int ix = ixs[i];
-        topKClassNames[i] = Constants.IMAGENET_CLASSES[ix];
+        topKClassNames[i] = Constants.MOBILENET_CLASSES[ix];
         topKScores[i] = scores[ix];
       }
       final long analysisDuration = SystemClock.elapsedRealtime() - startTime;
