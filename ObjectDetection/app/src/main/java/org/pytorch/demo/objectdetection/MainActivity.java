@@ -169,9 +169,9 @@ public class MainActivity extends AppCompatActivity implements Runnable {
 
                 mImgScaleX = (float)mBitmap.getWidth() / PrePostProcessor.mInputWidth;
                 mImgScaleY = (float)mBitmap.getHeight() / PrePostProcessor.mInputHeight;
-
                 mIvScaleX = (mBitmap.getWidth() > mBitmap.getHeight() ? (float)mImageView.getWidth() / mBitmap.getWidth() : (float)mImageView.getHeight() / mBitmap.getHeight());
                 mIvScaleY  = (mBitmap.getHeight() > mBitmap.getWidth() ? (float)mImageView.getHeight() / mBitmap.getHeight() : (float)mImageView.getWidth() / mBitmap.getWidth());
+
 
                 mStartX = (mImageView.getWidth() - mIvScaleX * mBitmap.getWidth())/2;
                 mStartY = (mImageView.getHeight() -  mIvScaleY * mBitmap.getHeight())/2;

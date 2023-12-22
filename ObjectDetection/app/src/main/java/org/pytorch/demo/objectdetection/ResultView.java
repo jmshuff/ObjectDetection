@@ -6,6 +6,9 @@
 
 package org.pytorch.demo.objectdetection;
 
+import static org.pytorch.demo.objectdetection.PrePostProcessor.mInputHeight;
+import static org.pytorch.demo.objectdetection.PrePostProcessor.mInputWidth;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -51,7 +54,6 @@ public class ResultView extends View {
             mPaintRectangle.setStrokeWidth(5);
             mPaintRectangle.setStyle(Paint.Style.STROKE);
             canvas.drawRect(result.rect, mPaintRectangle);
-
             Path mPath = new Path();
             RectF mRectF = new RectF(result.rect.left, result.rect.top, result.rect.left + TEXT_WIDTH,  result.rect.top + TEXT_HEIGHT);
             mPath.addRect(mRectF, Path.Direction.CW);
@@ -62,22 +64,23 @@ public class ResultView extends View {
             mPaintText.setStrokeWidth(0);
             mPaintText.setStyle(Paint.Style.FILL);
             mPaintText.setTextSize(32);
-            canvas.drawText(String.format("%s %.2f", PrePostProcessor.mClasses[result.classIndex], result.score), result.rect.left + TEXT_X, result.rect.top + TEXT_Y, mPaintText);
+            canvas.drawText(String.format("%s %.2f", PrePostProcessor.mClasses[0], result.score), result.rect.left + TEXT_X, result.rect.top + TEXT_Y, mPaintText);
             //canvas.drawText(String.format("%s %.2f", PrePostProcessor.mClasses[0], result.score), result.rect.left + TEXT_X, result.rect.top + TEXT_Y, mPaintText);
 
             Paint paint = new Paint();
             paint.setColor(Color.RED); // Color RED in ARGB format
+            paint.setAlpha(100);
             System.out.println(Arrays.toString(result.getMask()));
-            // Iterate through the maskArray and draw onto the Bitmap based on the values in the array
-            for (int y = 0; y < 80; y++) {
-                for (int x = 0; x < 80; x++) {
-                    // Assuming maskArray contains the mask values for each pixel
-                    float maskValue = result.getMask()[y * 80 + x];
-                    if (maskValue > 0.5) { // Apply a threshold for drawing the mask
-                        canvas.drawPoint(x, y, paint);
+            // Iterate through the 1d maskArray and draw onto the Bitmap based on the values in the array
+            for (int i = 0; i < mInputHeight; i++) {
+                for (int j = 0; j < mInputWidth; j++) {
+                    if (result.getMask()[i * mInputWidth + j] == 1.0) {
+                        canvas.drawRect(j, i, j + 1, i + 1, paint);
                     }
                 }
             }
+
+
 
         }
     }

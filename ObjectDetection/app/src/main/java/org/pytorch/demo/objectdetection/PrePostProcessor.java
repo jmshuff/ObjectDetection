@@ -11,6 +11,7 @@ import static java.lang.Math.min;
 import android.graphics.Rect;
 import android.util.Log;
 
+import org.pytorch.Module;
 import org.pytorch.Tensor;
 
 import java.util.ArrayList;
@@ -54,8 +55,8 @@ public class PrePostProcessor {
     // model output is of size 25200*(num_of_class+5)
         private static int mOutputRow = 6300; // as decided by the YOLOv5 model for input image of size 95640*640
     private static int mOutputColumn = 38; // left, top, right, bottom, score and 1 class probability
-    private static float mThreshold = 0.30f; // score above which a detection is generated
-    private static int mNmsLimit = 15;
+    private static float mThreshold = 0.60f; // score above which a detection is generated
+    private static int mNmsLimit = 1;
 
     static String[] mClasses;
 
@@ -71,13 +72,13 @@ public class PrePostProcessor {
     static ArrayList<Result> nonMaxSuppression(ArrayList<Result> boxes, int limit, float threshold) {
 
         // Do an argsort on the confidence scores, from high to low.
-        Collections.sort(boxes,
-                new Comparator<Result>() {
-                    @Override
-                    public int compare(Result o1, Result o2) {
-                        return o1.score.compareTo(o2.score);
-                    }
-                });
+        //sort from high to low
+        Collections.sort(boxes, Collections.reverseOrder(new Comparator<Result>() {
+            @Override
+            public int compare(Result o1, Result o2) {
+                return o1.score.compareTo(o2.score);
+            }
+        }));
 
         ArrayList<Result> selected = new ArrayList<>();
         boolean[] active = new boolean[boxes.size()];
@@ -143,15 +144,14 @@ public class PrePostProcessor {
                 float y = outputs[i* mOutputColumn +1];
                 float w = outputs[i* mOutputColumn +2];
                 float h = outputs[i* mOutputColumn +3];
-
                 //System.out.println("output: left-" + x + " top-" + y + " right-" + w + " bottom-" + h);
-
                 float left = imgScaleX * (x - w/2);
                 float top = imgScaleY * (y - h/2);
                 float right = imgScaleX * (x + w/2);
                 float bottom = imgScaleY * (y + h/2);
+                float[] bbox = {left, top, right, bottom};
 
-                float max = outputs[i* mOutputColumn +5];
+                float max = outputs[i* mOutputColumn +5]; //JS to look at
                 int cls = 0;
                 for (int j = 0; j < mOutputColumn -5; j++) {
                     if (outputs[i* mOutputColumn +5+j] > max) {
@@ -159,8 +159,8 @@ public class PrePostProcessor {
                         cls = j;
                     }
                 }
-
-                float[] mask = processMaskNative(proto, Arrays.copyOfRange(outputs,i*mOutputColumn + 6,  i*mOutputColumn + mOutputColumn));
+               //move this to only calculate mask for the final result
+                float[] mask = processMaskNative(proto, Arrays.copyOfRange(outputs,i*mOutputColumn + 6,  i*mOutputColumn + mOutputColumn), bbox);
                 Rect rect = new Rect((int)(startX+ivScaleX*left), (int)(startY+top*ivScaleY), (int)(startX+ivScaleX*right), (int)(startY+ivScaleY*bottom));
                 Result result = new Result(cls, outputs[i*mOutputColumn+4], rect, mask);
                 results.add(result);
@@ -170,7 +170,7 @@ public class PrePostProcessor {
         return nonMaxSuppression(results, mNmsLimit, mThreshold);
     }
 
-    static float[] processMaskNative(float[] protos, float[] masksIn) {
+    static float[] processMaskNative(float[] protos, float[] masksIn, float[] bbox) {
 
         int n = 1; //number of masks
         int mw = 80; //mask width
@@ -186,48 +186,28 @@ public class PrePostProcessor {
                 }
                 result[i * mh * mw + j] = sigmoid(sum); // Apply sigmoid or required function
             }
-            Log.d("resultshape", String.valueOf(result.length));
         }
+        float gain = Math.min((float)mh / mInputHeight, (float)mw / mInputWidth);
+        float padWidth = Math.max(0, (mw - mInputWidth * gain) / 2);
+        float padHeight = Math.max(0, (mh - mInputHeight * gain) / 2);
+        //use bilinear interpolation to resize the mask
+        //Log.d("maskSigmod", Arrays.toString(result));
+        result = bilinearInterpolation(n, result, mw, mh, gain, padWidth, padHeight); //this is making everything equal NaN. Need to fix
+        //crop the mask
+        //result = cropMask(result, bbox);
 
-        float gain = min(mh / mInputHeight, mw / mInputWidth);
-        float padWidth = (mw - mInputWidth* gain) / 2;
-        float padHeight= (mh - mInputHeight * gain) / 2;
+        Log.d("resultshape", String.valueOf(result.length));
+        Log.d("result", Arrays.toString(result));
 
+        //get result where value > 0.5
+        for (int i = 0; i < result.length; i++) {
+            if (result[i] > 0.5) {
+                result[i] = 1;
+            } else {
+                result[i] = 0;
+            }
+        }
         return result;
-
-/*        long[] protosShape = protos.shape();
-        int c = (int) protosShape[0]; // Assuming c = channels
-        int mh = (int) protosShape[1]; // Mask height
-        int mw = (int) protosShape[2]; // Mask width
-
-        // masks_in @ protos.float().view(c, -1)
-        Tensor masks = masksIn.mm(protos.view(c, -1).toType(masksIn.dtype())).sigmoid().view(-1, mh, mw);
-
-        // Calculate gain
-        float gain = Math.min((float) mh / shape[0], (float) mw / shape[1]); // gain  = old / new
-        float padX = (mw - shape[1] * gain) / 2;
-        float padY = (mh - shape[0] * gain) / 2;
-
-        int top = Math.round(padY);
-        int left = Math.round(padX);
-        int bottom = mh - Math.round(padY);
-        int right = mw - Math.round(padX);
-
-        // masks[:, top:bottom, left:right]
-        masks = masks.slice(1, top, bottom).slice(2, left, right);
-
-        // F.interpolate(masks[None], shape, mode='bilinear', align_corners=False)[0]
-        masks = Module.interpolate(masks.unsqueeze(0), shape, true).toTensor();
-
-        // masks = crop_mask(masks, bboxes);
-        // This section is approximate and should be substituted with actual cropping logic
-        // This assumes cropping logic based on bounding boxes, adjust as per your requirement
-        masks = customCropMaskLogic(masks, bboxes);
-
-        // masks.gt_(0.5)
-        masks = masks.gt(0.5);
-
-        return masks;*/
     }
 
 
@@ -235,6 +215,54 @@ public class PrePostProcessor {
         return (float) (1.0 / (1.0 + Math.exp(-x)));
     }
 
+    private static float[] bilinearInterpolation(int n, float[] masksIn, int mw, int mh, float gain, float padWidth, float padHeight){
+        float[] resizedMask = new float[n * mInputHeight * mInputWidth];
+
+        for (int i = 0; i < n; i++) {
+            for (int y = 0; y < mInputHeight; y++) {
+                for (int x = 0; x < mInputWidth; x++) {
+                    float srcX = (x + padWidth) / gain;
+                    float srcY = (y + padHeight) / gain;
+
+                    int x0 = (int) Math.floor(srcX);
+                    int x1 = Math.min(x0 + 1, mw - 1); //Math.min(x0 + 1, mw - 1
+                    int y0 = (int) Math.floor(srcY);
+                    int y1 = Math.min(y0 + 1, mh -1);
+
+                    float dx = srcX - x0;
+                    float dy = srcY - y0;
+
+                    float q00 = getPixelValue(masksIn, i, mw, mh, x0, y0);
+                    float q01 = getPixelValue(masksIn, i, mw, mh, x0, y1);
+                    float q10 = getPixelValue(masksIn, i, mw, mh, x1, y0);
+                    float q11 = getPixelValue(masksIn, i, mw, mh, x1, y1);
+
+                    float interpolatedValue = (1 - dx) * (1 - dy) * q00 + dx * (1 - dy) * q10 + (1 - dx) * dy * q01 + dx * dy * q11;
+
+                    resizedMask[i * mInputHeight * mInputWidth + y * mInputWidth + x] = interpolatedValue;
+                }
+            }
+        }
+        return resizedMask;
+    }
+
+    static float getPixelValue(float[] masks, int maskIndex, int maskWidth, int maskHeight, int x, int y) {
+        x = Math.min(Math.max(x, 0), maskWidth - 1);
+        y = Math.min(Math.max(y, 0), maskHeight - 1);
+        return masks[maskIndex * maskWidth * maskHeight + y * maskWidth + x];
+    }
+
+
+
+    private static float[] cropMask(float[] mask, float[] box) {
+        //set all values outside the bounding box to 0
+        for (int i = 0; i < mask.length; i++) {
+            if (i % 80 < box[0] || i % 80 > box[2] || i / 80 < box[1] || i / 80 > box[3]) {
+                mask[i] = 0;
+            }
+        }
+        return mask;
+    }
     private float[][][] reshape(float[] data, int dim1, int dim2, int dim3) {
         float[][][] result = new float[dim1][dim2][dim3];
         int index = 0;
