@@ -80,7 +80,7 @@ public class PrePostProcessor {
             }
         }));
 
-        ArrayList<Result> selected = new ArrayList<>();`
+        ArrayList<Result> selected = new ArrayList<>();
         boolean[] active = new boolean[boxes.size()];
         Arrays.fill(active, true);
         int numActive = active.length;
