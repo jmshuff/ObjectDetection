@@ -54,7 +54,7 @@ public class PrePostProcessor {
 
     // model output is of size 25200*(num_of_class+5)
         private static int mOutputRow = 6300; // as decided by the YOLOv5 model for input image of size 95640*640
-    private static int mOutputColumn = 38; // left, top, right, bottom, score and 1 class probability
+    private static int mOutputColumn = 38; // left, top, right, bottom, score, 32 masks, and 1 class probability
     private static float mThreshold = 0.60f; // score above which a detection is generated
     private static int mNmsLimit = 1;
 
@@ -80,7 +80,7 @@ public class PrePostProcessor {
             }
         }));
 
-        ArrayList<Result> selected = new ArrayList<>();
+        ArrayList<Result> selected = new ArrayList<>();`
         boolean[] active = new boolean[boxes.size()];
         Arrays.fill(active, true);
         int numActive = active.length;
